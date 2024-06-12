@@ -421,17 +421,6 @@
                     "type": "string",
                     "description": "A file containing protected regions to use for labelling aberrant reads.",
                     "hidden": true
-                },
-                "counts_filters": {
-                    "type": "array",
-                    "description": "A list of filters to use for computing counts. Each entry in the list will result in a separate counts calculation",
-                    "hidden": true,
-                    "items": {
-                        "type": "object",
-                        "additional_properties": {
-                            "type": "number"
-                        }
-                    }
                 }
             }
         },
@@ -751,14 +740,6 @@
                     "type": "boolean",
                     "fa_icon": "fas fa-fast-forward",
                     "description": "Skip all QC steps."
-                },
-                "qc_summary_config": {
-                    "description": "Any number of properties, each to be interpreted as the name of a metric generated or passed into AP15 and the value of the property is the minimum value to pass QC",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
-                    },
-                    "hidden": true
                 }
             }
         },
