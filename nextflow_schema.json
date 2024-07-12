@@ -1,0 +1,966 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://gitlab.com/adelabio/data-science/nf-cfmedip/-/raw/main/nextflow_schema.json",
+    "title": "nf-cfmedip pipeline parameters",
+    "description": "cfMeDIP peak-calling and differential analysis pipeline.",
+    "type": "object",
+    "definitions": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Define where the pipeline should find input data and save output data.",
+            "required": [
+                "input",
+                "output_root",
+                "output_subdir"
+            ],
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "schema": "assets/schema_input.json",
+                    "description": "Path to a comma-separated samplesheet with three columns: sample, fastq_1, fastq_2.",
+                    "help_text": "S3 paths must be prefixed with 's3://'. See [usage docs](https://gitlab.com/adelabio/data-science/nf-cfmedip/-/blob/main/docs/usage.md).",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "output_root": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The output root directory (or s3 bucket) where results will be saved. Generally should not be changed. Cannot contain spaces.",
+                    "fa_icon": "fas fa-folder-open",
+                    "pattern": "^\\S+$"
+                },
+                "output_subdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The subdirectory within output_root where results will be saved. This serves as an identifier for the run and should usually match the run name above. Can only contain [a-z0-9_].",
+                    "help_text": "The values 'catalog', 'runs_detail', 'runs', 'ctdna_quant', 'runs_qc', and 'coverage_files' are not allowed.",
+                    "fa_icon": "fas fa-folder-open",
+                    "pattern": "(?=^(?!(catalog|runs_detail|runs|ctdna_quant|runs_qc|coverage_files)$))(?=^[a-z0-9_]*$)"
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "fa_icon": "fas fa-folder-open",
+                    "hidden": true
+                },
+                "fragment_size": {
+                    "type": "integer",
+                    "description": "Estimated fragment size used to extend single-end reads.",
+                    "fa_icon": "fas fa-chart-area",
+                    "default": 100
+                },
+                "seq_center": {
+                    "type": "string",
+                    "description": "Sequencing center information to be added to read group of BAM files.",
+                    "fa_icon": "fas fa-synagogue"
+                },
+                "read_length": {
+                    "type": "integer",
+                    "description": "Read length used to calculate MACS2 genome size for peak calling if `--macs_gsize` isn't provided.",
+                    "fa_icon": "fas fa-chart-area",
+                    "default": 100,
+                    "enum": [
+                        50,
+                        75,
+                        100,
+                        150,
+                        200
+                    ]
+                }
+            }
+        },
+        "reference_genome_options": {
+            "title": "Reference genome options",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "description": "Reference genome related files and options required for the workflow.",
+            "properties": {
+                "genome": {
+                    "type": "string",
+                    "description": "Name of iGenomes reference.",
+                    "fa_icon": "fas fa-book",
+                    "help_text": "If using a reference genome configured in the pipeline using iGenomes, use this parameter to give the ID for the reference. This is then used to build the full paths for all required reference genome files e.g. `--genome GRCh38`. \n\nSee the [nf-core website docs](https://nf-co.re/usage/reference_genomes) for more details."
+                },
+                "fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to FASTA genome file.",
+                    "help_text": "This parameter is *mandatory* if `--genome` is not specified. If you don't have the appropriate alignment index available this will be generated for you automatically. Combine with `--save_reference` to save alignment index for future runs.",
+                    "fa_icon": "far fa-file-code"
+                },
+                "spikein_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to spike-in FASTA that was used to generate index.",
+                    "help_text": "This file will not be used to create the index. That must be passed in. It is only used to split out the spikein reads.",
+                    "fa_icon": "far fa-file-code"
+                },
+                "gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.gtf(\\.gz)?$",
+                    "description": "Path to GTF annotation file.",
+                    "fa_icon": "fas fa-code-branch",
+                    "help_text": "This parameter is *mandatory* if `--genome` is not specified."
+                },
+                "gff": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.gff(\\.gz)?$",
+                    "fa_icon": "fas fa-code-branch",
+                    "description": "Path to GFF3 annotation file.",
+                    "help_text": "This parameter must be specified if `--genome` or `--gtf` are not specified."
+                },
+                "bowtie2_index": {
+                    "type": "string",
+                    "format": "path",
+                    "fa_icon": "fas fa-bezier-curve",
+                    "description": "Path to directory or tar.gz archive for pre-built Bowtie2 index."
+                },
+                "gene_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "fa_icon": "fas fa-procedures",
+                    "description": "Path to BED file containing gene intervals. This will be created from the GTF file if not specified."
+                },
+                "tss_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "fa_icon": "fas fa-procedures",
+                    "description": "Path to BED file containing transcription start sites. This will be created from the gene BED file if not specified."
+                },
+                "macs_gsize": {
+                    "type": "number",
+                    "description": "Effective genome size parameter required by MACS3.",
+                    "help_text": "[Effective genome size](https://github.com/taoliu/MACS#-g--gsize) parameter required by MACS3. If using an iGenomes reference these have been provided when `--genome` is set as *GRCh37*, *GRCh38*, *GRCm38*, *WBcel235*, *BDGP6*, *R64-1-1*, *EF2*, *hg38*, *hg19* and *mm10*. For other genomes, if this parameter is not specified then the MACS2 peak-calling and differential analysis will be skipped.",
+                    "fa_icon": "fas fa-arrows-alt-h"
+                },
+                "blacklist": {
+                    "type": "string",
+                    "description": "Path to blacklist regions in BED format, used for filtering alignments.",
+                    "help_text": "If provided, alignments that overlap with the regions in this file will be filtered out (see [ENCODE blacklists](https://sites.google.com/site/anshulkundaje/projects/blacklists)). The file should be in BED format. Blacklisted regions for *GRCh37*, *GRCh38*, *GRCm38*, *hg19*, *hg38*, *mm10* are bundled with the pipeline in the [`blacklists`](../assets/blacklists/) directory, and as such will be automatically used if any of those genomes are specified with the `--genome` parameter.",
+                    "fa_icon": "fas fa-book-dead"
+                },
+                "mito_name": {
+                    "type": "string",
+                    "description": "Name of Mitochondrial chomosome in reference assembly e.g. chrM.",
+                    "help_text": "Reads aligning to this contig are filtered out if a valid identifier is provided otherwise this step is skipped. Where possible these have been provided in the [`igenomes.config`](../conf/igenomes.config).",
+                    "fa_icon": "fas fa-signature"
+                },
+                "save_reference": {
+                    "type": "boolean",
+                    "description": "If generated by the pipeline save the aligner index (e.g. BWA) in the results directory.",
+                    "help_text": "If the index generated by the aligner is generated by the pipeline use this parameter to save it to your results folder. These can then be used for future pipeline runs, reducing processing times.",
+                    "fa_icon": "fas fa-save"
+                },
+                "igenomes_base": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory / URL base for iGenomes references.",
+                    "default": "s3://adela-reference-files/igenomes_clone_20230130",
+                    "fa_icon": "fas fa-cloud-download-alt",
+                    "hidden": true
+                },
+                "igenomes_ignore": {
+                    "type": "boolean",
+                    "description": "Do not load the iGenomes reference config.",
+                    "fa_icon": "fas fa-ban",
+                    "hidden": true,
+                    "help_text": "Do not load `igenomes.config` when running the pipeline. You may choose this option if you observe clashes between custom parameters and those supplied in `igenomes.config`."
+                },
+                "keep_mito": {
+                    "type": "boolean",
+                    "description": "Reads mapping to mitochondrial contig are not filtered from alignments.",
+                    "default": false
+                },
+                "genomes": {
+                    "type": "object",
+                    "description": "Map to relevant genome files for each available genome.",
+                    "hidden": true,
+                    "additional_properties": {
+                        "type": "object",
+                        "properties": {
+                            "fasta": {
+                                "type": "string"
+                            },
+                            "bowtie2": {
+                                "type": "string"
+                            },
+                            "gtf": {
+                                "type": "string"
+                            },
+                            "bed12": {
+                                "type": "string"
+                            },
+                            "mito_name": {
+                                "type": "string"
+                            },
+                            "blacklist": {
+                                "type": "string"
+                            },
+                            "macs_gsize": {
+                                "type": "object",
+                                "additional_properties": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "adapter_trimming_options": {
+            "title": "Filtering and adapter trimming options",
+            "type": "object",
+            "fa_icon": "fas fa-cut",
+            "description": "Options to adjust adapter trimming and read filtering criteria.",
+            "properties": {
+                "skip_trimming": {
+                    "type": "boolean",
+                    "description": "Skip the adapter trimming step.",
+                    "help_text": "Use this if your input FastQ files have already been trimmed outside of the workflow or if you're very confident that there is no adapter contamination in your data.",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "save_trimmed": {
+                    "type": "boolean",
+                    "description": "Save the trimmed FastQ files in the results directory.",
+                    "help_text": "By default, trimmed FastQ files will not be saved to the results directory. Specify this flag (or set to true in your config file) to copy these files to the results directory when complete.",
+                    "fa_icon": "fas fa-save"
+                },
+                "adapter_sequence_r1": {
+                    "type": "string",
+                    "description": "The adapter sequence to use for read 1 reads.",
+                    "fa_icon": "fas fa-dna",
+                    "default": "AATGATACGGCGACCACCGAGATCTACACATATGCGCACACTCTTTCCCTACACGAC"
+                },
+                "adapter_sequence_r2": {
+                    "type": "string",
+                    "description": "The adapter sequence to use for read 2 reads.",
+                    "fa_icon": "fas fa-dna",
+                    "default": "CAAGCAGAAGACGGCATACGAGATACGATCAGGTGACTGGAGTTCAGACGTGT"
+                },
+                "average_qual_filter": {
+                    "type": "integer",
+                    "description": "Drop reads with average quality < this value.",
+                    "fa_icon": "fas fa-sort-amount-down"
+                },
+                "umi_len": {
+                    "type": "integer",
+                    "description": "Length of UMI in read. Ignored if umi_in_index==true",
+                    "fa_icon": "fas fa-arrows-alt-h",
+                    "default": 5
+                },
+                "umi_in_index": {
+                    "type": "boolean",
+                    "description": "If the UMI is in the index. Otherwise look for it in the read.",
+                    "fa_icon": "fas fa-barcode",
+                    "default": false
+                }
+            }
+        },
+        "viral_identification_options": {
+            "title": "Identify viral reads using fastv",
+            "type": "object",
+            "fa_icon": "fas fa-virus",
+            "description": "Options to adjust adapter trimming and read filtering criteria.",
+            "properties": {
+                "skip_viral_identification": {
+                    "type": "boolean",
+                    "description": "Skip the viral identification step using fastv.",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "viral_kmer_fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "description": "Path to a viral kmer collection fasta to be passed to fastv.",
+                    "help_text": "See fastv documentation for details.",
+                    "fa_icon": "fas fa-virus"
+                },
+                "save_viral_on_target": {
+                    "type": "boolean",
+                    "description": "Save FastQ files containing reads identified as on-target by fastv.",
+                    "fa_icon": "fas fa-save"
+                }
+            }
+        },
+        "alignment_options": {
+            "title": "Alignment options",
+            "type": "object",
+            "fa_icon": "fas fa-map-signs",
+            "description": "Options to adjust parameters and filtering criteria for read alignments.",
+            "properties": {
+                "aligner": {
+                    "type": "string",
+                    "default": "bowtie2",
+                    "description": "Specifies the alignment algorithm to use - the only curent available option is 'bowtie2'.",
+                    "fa_icon": "fas fa-map-signs",
+                    "enum": [
+                        "bowtie2"
+                    ]
+                },
+                "keep_multi_map": {
+                    "type": "boolean",
+                    "description": "Reads mapping to multiple locations are not filtered from alignments.",
+                    "fa_icon": "fas fa-cart-arrow-down"
+                },
+                "skip_merge_replicates": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Do not perform alignment merging and downstream analysis by merging replicates i.e. only do this by merging resequenced libraries.",
+                    "help_text": "An additional series of steps are performed by the pipeline for merging the replicates from the same experimental group. This is primarily to increase the sequencing depth in order to perform downstream analyses such as footprinting. Specifying this parameter means that these steps will not be performed.",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "save_align_intermeds": {
+                    "type": "boolean",
+                    "description": "Save the intermediate BAM files from the alignment step.",
+                    "help_text": "By default, intermediate BAM files will not be saved. The final BAM files created after the appropriate filtering step are always saved to limit storage usage. Set this parameter to also save other intermediate BAM files.",
+                    "fa_icon": "fas fa-save"
+                },
+                "save_unaligned": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-save",
+                    "description": "Where possible, save unaligned reads from either STAR, HISAT2 or Salmon to the results directory.",
+                    "help_text": "This may either be in the form of FastQ or BAM files depending on the options available for that particular tool."
+                },
+                "bamtools_filter_pe_config": {
+                    "type": "string",
+                    "default": "$projectDir/assets/bamtools_filter_pe.json",
+                    "hidden": true,
+                    "description": "BAMTools JSON file with custom filters for paired-end data.",
+                    "fa_icon": "fas fa-cog"
+                },
+                "bamtools_filter_se_config": {
+                    "type": "string",
+                    "default": "$projectDir/assets/bamtools_filter_se.json",
+                    "hidden": true,
+                    "description": "BAMTools JSON file with custom filters for single-end data.",
+                    "fa_icon": "fas fa-cog"
+                }
+            }
+        },
+        "deduplication_options": {
+            "title": "Deduplication options",
+            "type": "object",
+            "fa_icon": "fas fa-clone",
+            "description": "Options to adjust peak calling criteria.",
+            "properties": {
+                "umi_dedup": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-cart-arrow-down",
+                    "description": "Enable UMI based deduplication using umi_tools for hg38 bams. The spike-in bams are always umi_deduplicated, regardless of this flag",
+                    "help_text": "You cannot disable optical_dedup AND umi_dedup simultaneously.",
+                    "default": false
+                },
+                "umi_dedup_discard_unpaired": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-cart-arrow-down",
+                    "description": "Discard unpaired reads during UMI based deduplication.",
+                    "help_text": "This passes `--unpaired-reads=discard` to `umi_tools dedup`",
+                    "default": true
+                },
+                "umi_dedup_discard_chimeric": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-cart-arrow-down",
+                    "description": "Discard chimeric pairs during UMI based deduplication.",
+                    "help_text": "This passes `--chimeric-pairs=discard` to `umi_tools dedup`",
+                    "default": true
+                },
+                "umi_dedup_stats": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-save",
+                    "description": "Compute stats after UMI based deduplication",
+                    "help_text": "Compute stats after UMI based deduplication.",
+                    "default": true
+                },
+                "skip_coverage_files": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip bedgraph/bigwig generation",
+                    "fa_icon": "fas fa-fast-forward"
+                }
+            }
+        },
+        "read_counting_options": {
+            "title": "Read counting options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-bar",
+            "description": "Options to adjust read counting.",
+            "properties": {
+                "feature_sets": {
+                    "type": "string",
+                    "description": "Comma separated list (without spaces) of feature sets to use as ROIs for computing counts",
+                    "help_text": "A feature set can be specified as a feature_set_id OR a file path to a reference feature set in csv.gz format. See documentation for details.",
+                    "fa_icon": "fas fa-book",
+                    "default": "s3://adela-reference-files/feature_sets/union_for_counts_v0.csv.gz",
+                    "pattern": "^\\S+$"
+                },
+                "databricks_env_name": {
+                    "type": "string",
+                    "description": "Which environment of databricks to grab feature sets from.",
+                    "fa_icon": "fas fa-cogs",
+                    "hidden": true
+                },
+                "protected_regions_bed": {
+                    "type": "string",
+                    "description": "A file containing protected regions to use for labelling aberrant reads.",
+                    "hidden": true
+                },
+                "counts_filters": {
+                    "type": "array",
+                    "description": "A list of filters to use for computing counts. Each entry in the list will result in a separate counts calculation",
+                    "hidden": true,
+                    "items": {
+                        "type": "object",
+                        "additional_properties": {
+                            "type": "number"
+                        }
+                    }
+                }
+            }
+        },
+        "peak_calling_options": {
+            "title": "Peak calling options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "Options to adjust peak calling criteria.",
+            "properties": {
+                "skip_peak_calling": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip peak calling",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "narrow_peak": {
+                    "type": "boolean",
+                    "description": "Run MACS3 in narrowPeak mode.",
+                    "help_text": "MACS3 is run by default with the [`--broad`](https://github.com/taoliu/MACS#--broad) flag. Specify this flag to call peaks in narrowPeak mode.",
+                    "fa_icon": "fas fa-arrows-alt-h"
+                },
+                "broad_cutoff": {
+                    "type": "number",
+                    "default": 0.1,
+                    "description": "Specifies broad cutoff value for MACS3. Only used when --narrow_peak isnt specified.",
+                    "fa_icon": "fas fa-hand-scissors"
+                },
+                "macs_fdr": {
+                    "type": "number",
+                    "description": "Minimum FDR (q-value) cutoff for peak detection, --macs_fdr and --macs_pvalue are mutually exclusive.",
+                    "fa_icon": "fas fa-sort-amount-down",
+                    "default": 0.01
+                },
+                "macs_pvalue": {
+                    "type": "number",
+                    "description": "p-value cutoff for peak detection, --macs_fdr and --macs_pvalue are mutually exclusive. If --macs_pvalue cutoff is set, q-value will not be calculated and reported as -1 in the final .xls file.",
+                    "fa_icon": "fas fa-sort-amount-down"
+                },
+                "save_macs_pileup": {
+                    "type": "boolean",
+                    "description": "Instruct MACS3 to create bedGraph files normalised to signal per million reads.",
+                    "fa_icon": "fas fa-save"
+                },
+                "skip_peak_annotation": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-fast-forward",
+                    "description": "Skip annotation of MACS3 and consensus peaks with HOMER."
+                },
+                "homer_args": {
+                    "type": "string",
+                    "description": "Extra args to pass to homer annotatePeaks.",
+                    "fa_icon": "fas fa-chart-area",
+                    "default": "-cons -CpG"
+                },
+                "homer_gene_ontology": {
+                    "type": "boolean",
+                    "description": "Enable gene ontology in homer annotatePeaks. WARNING: this is experimental and may not work.",
+                    "fa_icon": "fas fa-dna",
+                    "default": false
+                },
+                "motif_beds": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "The path to an S3 directory contain motif bed files of interest.",
+                    "fa_icon": "fas fa-code-branch",
+                    "default": "s3://adela-reference-files/motifs/hocomoco_v11_hg38_p1e-6/"
+                }
+            }
+        },
+        "cross_contamination_options": {
+            "title": "Cross contamination options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "Options to adjust cross contamination evaluation.",
+            "properties": {
+                "skip_contamination": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip cross contamination evaluation",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "no_intervals": {
+                    "type": "boolean",
+                    "description": "Disable usage of intervals.",
+                    "help_text": "Intervals are parts of the chopped up genome used to speed up preprocessing and variant calling.",
+                    "fa_icon": "fas fa-ban",
+                    "default": false
+                },
+                "nucleotides_per_second": {
+                    "type": "number",
+                    "fa_icon": "fas fa-clock",
+                    "description": "Estimate interval size.",
+                    "help_text": "Intervals are parts of the chopped up genome used to speed up preprocessing and variant calling. Bed files from target sequencing can contain thousands of small intervals. Spinning up a new process for each can be quite resource intensive. Instead it can be desired to process small intervals together on larger nodes. \nIn order to make use of this parameter, no runtime estimate can be present in the bed file (column 5). ",
+                    "default": 200000
+                },
+                "xcontam_max_af": {
+                    "type": "number",
+                    "description": "Only consider variants in the VCF with population AF less than or equal to this",
+                    "help_text": "See GATK GetPileupSummaries documentation for more details",
+                    "fa_icon": "fas fa-sort-amount-down",
+                    "default": 0.2
+                },
+                "xcontam_min_af": {
+                    "type": "number",
+                    "description": "Only consider variants in the VCF with population AF greater than or equal to this",
+                    "help_text": "See GATK GetPileupSummaries documentation for more details",
+                    "fa_icon": "fas fa-sort-amount-down",
+                    "default": 0.01
+                },
+                "xcontam_mmq": {
+                    "type": "number",
+                    "description": "Only consider reads with a mapping quality greater than or equal to this",
+                    "help_text": "See GATK GetPileupSummaries documentation for more details",
+                    "fa_icon": "fas fa-sort-amount-down",
+                    "default": 0
+                }
+            }
+        },
+        "tfea_options": {
+            "title": "TFEA options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "Options to adjust TFEA analysis.",
+            "properties": {
+                "skip_tfea": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-fast-forward",
+                    "description": "Skip TFEA. You must set skip_coverage_files=true because TFEA requires a bedgraph as input. If you do not the workflow will error",
+                    "default": true
+                },
+                "tfea_filter_strs": {
+                    "type": "string",
+                    "fa_icon": "fas fa-sort-amount-down",
+                    "description": "A comma separated list (without spaces) of filter_str values to use for molecular filtering of bedgraphs before TFEA. If none supplied, will use unfiltered bedgraph.",
+                    "pattern": "^\\S+$",
+                    "default": null
+                },
+                "tfea_feature_sets": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "A comma separated list (without spaces) of feature sets to use as ROIs for TFEA.",
+                    "help_text": "A feature set can be specified as a feature_set_id OR a file path to a reference feature set in csv.gz format. See documentation for details.",
+                    "pattern": "^\\S+$",
+                    "default": "mumerge_peaks_intersect_gruca_1000bp_enhancers"
+                },
+                "tfea_controls_basedir": {
+                    "type": "string",
+                    "fa_icon": "fas fa-folder-open",
+                    "description": "The root directory containing the TFEA controls. Cannot contain spaces.",
+                    "pattern": "^\\S+$",
+                    "default": "s3://oap-research-ue1-dev-research-working/tfea_controls_unnormalized"
+                },
+                "tfea_controls": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "A comma separated list of sample names to use as controls. Nextflow will look for the controls in <tfea_controls_basedir>/<tfea_control><tfea_controls_suffix>. Cannot contain spaces",
+                    "pattern": "^\\S+$",
+                    "default": "TO21-AA233-0P11E1N1,TO21-AA663-0P11E1N1,TO21-AA939-0P11E1N1,TO21-AA913-0P11E1N1,TO21-AA975-0P11E1N1,TO21-AA103-0P11E1N1,TO21-AA518-0P11E1N1,TO21-AB989-0P11E1N1,TO21-AA601-0P11E1N1,TO21-AA204-0P11E1N1,TO21-AA744-0P11E1N1,TO21-AA503-0P11E1N1,TO21-AB731-0P11E1N1,TO21-AA347-0P11E1N1,TO21-AA449-0P11E1N1,TO21-AA302-0P11E1N1,TO21-AA237-0P11E1N1,TO21-AA580-0P11E1N1,TO21-AA694-0P11E1N1,TO21-AB496-0P11E1N1,TO21-AA052-0P11E1N1,TO21-AA042-0P11E1N1,TO21-AB033-0P11E1N1,TO21-AA542-0P11E1N1,TO21-AA600-0P11E1N1,TO21-AA652-0P11E1N1,TO21-AB110-0P11E1N1,TO21-AA789-0P11E1N1,TO21-AA957-0P11E1N1"
+                },
+                "tfea_controls_suffix": {
+                    "type": "string",
+                    "fa_icon": "fas fa-fast-forward",
+                    "description": "The suffix to apply to the sample names listed in tfea_controls. Nextflow will look for the controls in <tfea_controls_basedir>/<tfea_control><tfea_controls_suffix>. Cannot contain spaces",
+                    "pattern": "^\\S+$",
+                    "default": ".dd.clN.unscaled.bedGraph"
+                },
+                "fimo_motifs_basedir": {
+                    "type": "string",
+                    "fa_icon": "fas fa-folder-open",
+                    "description": "The root directory containing the motif databases. Cannot contain spaces.",
+                    "pattern": "^\\S+$",
+                    "default": "s3://adela-reference-files/motifs/meme"
+                },
+                "fimo_motifs": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "A comma separated list of motif databases. Cannot contain spaces",
+                    "pattern": "^\\S+$",
+                    "default": "best_curated_Human.meme"
+                },
+                "tfea_mdd_pval": {
+                    "type": "number",
+                    "fa_icon": "fas fa-hand-scissors",
+                    "description": "P-value cutoff for retaining differential regions.",
+                    "default": 0.2
+                }
+            }
+        },
+        "prediction_model_options": {
+            "title": "Prediction model options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "Options to adjust prediction model.",
+            "properties": {
+                "skip_prediction_model": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-fast-forward",
+                    "description": "Skip prediction model",
+                    "default": false
+                },
+                "prediction_model": {
+                    "type": "string",
+                    "default": "snr",
+                    "fa_icon": "fas fa-laptop-code",
+                    "description": "Which prediction model to use",
+                    "help_text": "The pipeline starts from this step and then runs through the possible subsequent steps.",
+                    "enum": [
+                        "snr",
+                        "poisson"
+                    ]
+                },
+                "prediction_background_dmrs": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "Comma separated list (without spaces) of feature sets to use as ROIs for computing sample background variability.",
+                    "help_text": "A feature set can be specified as a feature_set_id OR a file path to a reference feature set in csv.gz format. See documentation for details.",
+                    "pattern": "^\\S+$",
+                    "default": "s3://adela-reference-files/feature_sets/ed001_hn_ctl_cs_similar_3165_v0.csv.gz"
+                },
+                "prediction_cancer_dmrs": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "Comma separated list (without spaces) of feature sets to use as ROIs for computing ctDNA quant.",
+                    "help_text": "A feature set can be specified as a feature_set_id OR a file path to a reference feature set in csv.gz format. See documentation for details.",
+                    "pattern": "^\\S+$",
+                    "default": "s3://adela-reference-files/feature_sets/ed001_control_blood_quiet_rois_refined_33k_rm_ebs_hi_28396_v0.csv.gz"
+                },
+                "prediction_cancer_weights_column": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "Comma separated list (without spaces) of the names of weight columns in the supplied prediction_cancer_dmrs feature sets",
+                    "help_text": "Each supplied weight must be present in ALL the provided prediction_cancer_dmrs feature sets",
+                    "pattern": "^weight__[a-zA-Z0-9_-]+(,weight__[a-zA-Z0-9_-]+)*$",
+                    "default": null
+                },
+                "prediction_threshold": {
+                    "type": "number",
+                    "fa_icon": "fas fa-hand-scissors",
+                    "description": "Threshold for ctDNA quant cancer positive/negative determination.",
+                    "default": 0.541566
+                },
+                "poisson_lambda_baseline": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                },
+                "poisson_lambda_cancer": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                },
+                "poisson_noise_offset": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                },
+                "poisson_noise_coefficient": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                },
+                "poisson_logistic_intercept": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                },
+                "poisson_logistic_rate": {
+                    "type": "number",
+                    "fa_icon": "fas fa-tools",
+                    "description": "A parameter for the poisson prediction model. Only used if prediction_model == 'poisson'"
+                }
+            }
+        },
+        "qc_options": {
+            "title": "QC options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "Options to skip various steps within the workflow.",
+            "properties": {
+                "frip_feature_sets": {
+                    "type": "string",
+                    "fa_icon": "fas fa-book",
+                    "description": "A comma separated list (without spaces) of feature sets to use as ROIs for the feature set FRiP Score",
+                    "help_text": "A feature set can be specified as a feature_set_id OR a file path to a reference feature set in csv.gz format. See documentation for details.",
+                    "pattern": "^\\S+$",
+                    "default": "s3://adela-reference-files/feature_sets/ed001_control_blood_quiet_regions_v0.csv.gz"
+                },
+                "skip_picard_metrics": {
+                    "type": "boolean",
+                    "description": "Skip Picard CollectMultipleMetrics.",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "preseq_extrapolation_step": {
+                    "type": "integer",
+                    "description": "Preseq extrapolation step size.",
+                    "fa_icon": "fas fa-arrows-alt-h",
+                    "default": 10000000
+                },
+                "preseq_max_extrapolation": {
+                    "type": "integer",
+                    "description": "Preseq maximum reads to extrapolate to.",
+                    "fa_icon": "fas fa-step-forward",
+                    "default": 1000000000
+                },
+                "skip_preseq": {
+                    "type": "boolean",
+                    "description": "Skip Preseq.",
+                    "fa_icon": "fas fa-fast-forward",
+                    "default": false
+                },
+                "skip_plot_fingerprint": {
+                    "type": "boolean",
+                    "description": "Skip deepTools plotFingerprint.",
+                    "fa_icon": "fas fa-fast-forward"
+                },
+                "skip_qc": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-fast-forward",
+                    "description": "Skip all QC steps."
+                },
+                "qc_summary_config": {
+                    "description": "Any number of properties, each to be interpreted as the name of a metric generated or passed into AP15 and the value of the property is the minimum value to pass QC",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    },
+                    "hidden": true
+                }
+            }
+        },
+        "institutional_config_options": {
+            "title": "Institutional config options",
+            "type": "object",
+            "fa_icon": "fas fa-university",
+            "description": "Parameters used to describe centralised config profiles. These should not be edited.",
+            "help_text": "The centralised nf-core configuration profiles use a handful of pipeline parameters to describe themselves. This information is then printed to the Nextflow log when you run a pipeline. You should not need to change these values when you run a pipeline.",
+            "properties": {
+                "custom_config_version": {
+                    "type": "string",
+                    "description": "Git commit id for Institutional configs.",
+                    "default": "master",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "custom_config_base": {
+                    "type": "string",
+                    "description": "Base directory for Institutional configs.",
+                    "default": "https://raw.githubusercontent.com/nf-core/configs/master",
+                    "hidden": true,
+                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_name": {
+                    "type": "string",
+                    "description": "Institutional config name.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Institutional config description.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Institutional config contact information.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Institutional config URL link.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                }
+            }
+        },
+        "max_job_request_options": {
+            "title": "Max job request options",
+            "type": "object",
+            "fa_icon": "fab fa-acquisitions-incorporated",
+            "description": "Set the top limit for requested resources for any single job.",
+            "help_text": "If you are running on a smaller system, a pipeline step requesting more resources than are available may cause the Nextflow to stop the run with an error. These options allow you to cap the maximum resources requested by any single job so that the pipeline will run on your system.\n\nNote that you can not _increase_ the resources requested by any job using these options. For that you will need your own configuration file. See [the nf-core website](https://nf-co.re/usage/configuration) for details.",
+            "properties": {
+                "max_cpus": {
+                    "type": "integer",
+                    "description": "Maximum number of CPUs that can be requested for any single job.",
+                    "default": 16,
+                    "fa_icon": "fas fa-microchip",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the CPU requirement for each process. Should be an integer e.g. `--max_cpus 1`"
+                },
+                "max_memory": {
+                    "type": "string",
+                    "description": "Maximum amount of memory that can be requested for any single job.",
+                    "default": "128.GB",
+                    "fa_icon": "fas fa-memory",
+                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the memory requirement for each process. Should be a string in the format integer-unit e.g. `--max_memory '8.GB'`"
+                },
+                "max_time": {
+                    "type": "string",
+                    "description": "Maximum amount of time that can be requested for any single job.",
+                    "default": "240.h",
+                    "fa_icon": "far fa-clock",
+                    "pattern": "^(\\d+\\.?\\s*(s|m|h|day)\\s*)+$",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the time requirement for each process. Should be a string in the format integer-unit e.g. `--max_time '2.h'`"
+                }
+            }
+        },
+        "generic_options": {
+            "title": "Generic options",
+            "type": "object",
+            "fa_icon": "fas fa-file-import",
+            "description": "Less common options for the pipeline, typically set in a config file.",
+            "help_text": "These options are common to all nf-core pipelines and allow you to customise some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
+            "properties": {
+                "help": {
+                    "type": "boolean",
+                    "description": "Display help text.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "publish_dir_mode": {
+                    "type": "string",
+                    "default": "copy",
+                    "description": "Method used to save pipeline results to output directory.",
+                    "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
+                    "fa_icon": "fas fa-copy",
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
+                    "hidden": true
+                },
+                "fingerprint_bins": {
+                    "type": "integer",
+                    "default": 500000,
+                    "description": "Number of genomic bins to use when calculating deepTools fingerprint plot.",
+                    "fa_icon": "fas fa-dumpster",
+                    "hidden": true
+                },
+                "monochrome_logs": {
+                    "type": "boolean",
+                    "description": "Do not use coloured log outputs.",
+                    "fa_icon": "fas fa-palette",
+                    "hidden": true
+                },
+                "trace_timestamp": {
+                    "type": "string",
+                    "description": "Timestamp used to label pipeline artifacts.",
+                    "fa_icon": "fas fa-cogs",
+                    "hidden": true
+                },
+                "tracedir": {
+                    "type": "string",
+                    "description": "Directory to keep pipeline Nextflow logs and reports.",
+                    "fa_icon": "fas fa-cogs",
+                    "hidden": true
+                },
+                "validate_params": {
+                    "type": "boolean",
+                    "description": "Boolean whether to validate parameters against the schema at runtime",
+                    "default": true,
+                    "fa_icon": "fas fa-check-square",
+                    "hidden": true
+                },
+                "show_hidden_params": {
+                    "type": "boolean",
+                    "fa_icon": "far fa-eye-slash",
+                    "description": "Show all params when using `--help`",
+                    "hidden": true,
+                    "help_text": "By default, parameters set as _hidden_ in the schema are not shown on the command line when a user runs with `--help`. Specifying this option will tell the pipeline to show all parameters."
+                }
+            }
+        }
+    },
+    "allOf": [
+        {
+            "$ref": "#/definitions/input_output_options"
+        },
+        {
+            "$ref": "#/definitions/reference_genome_options"
+        },
+        {
+            "$ref": "#/definitions/adapter_trimming_options"
+        },
+        {
+            "$ref": "#/definitions/viral_identification_options"
+        },
+        {
+            "$ref": "#/definitions/alignment_options"
+        },
+        {
+            "$ref": "#/definitions/deduplication_options"
+        },
+        {
+            "$ref": "#/definitions/read_counting_options"
+        },
+        {
+            "$ref": "#/definitions/peak_calling_options"
+        },
+        {
+            "$ref": "#/definitions/cross_contamination_options"
+        },
+        {
+            "$ref": "#/definitions/tfea_options"
+        },
+        {
+            "$ref": "#/definitions/prediction_model_options"
+        },
+        {
+            "$ref": "#/definitions/qc_options"
+        },
+        {
+            "$ref": "#/definitions/institutional_config_options"
+        },
+        {
+            "$ref": "#/definitions/max_job_request_options"
+        },
+        {
+            "$ref": "#/definitions/generic_options"
+        }
+    ]
+}
