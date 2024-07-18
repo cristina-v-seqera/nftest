@@ -1,16 +1,23 @@
 #!/usr/bin/env nextflow
+nextflow.enable.dsl=2
 
-process sayHello {
+process publishReport {
+  publishDir "${params.outdir}", mode: 'copy'
   input: 
-    val x
+    path (x)
   output:
     stdout
+    path '*'
+
   script:
     """
-    echo '$x world!'
+    echo 'File is $x'
+    cat $x > published_$x
     """
 }
 
 workflow {
-  Channel.of('Bonjour', 'Ciao', 'Hello', 'Hola') | sayHello | view
+   Channel.of(params.file2, params.file3, params.multi)
+    | publishReport
 }
+
