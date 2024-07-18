@@ -17,7 +17,7 @@ process publishReport {
 }
 
 workflow {
-   Channel.of(params.file2, params.file3, params.multi)
+   Channel.of(params.file2, params.multi)
     | publishReport
 }
 
