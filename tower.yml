@@ -1,0 +1,41 @@
+reports:
+  "execution_report_*.html":
+    display: "Nextflow execution report"
+  "execution_timeline_*.html":
+    display: "Nextflow execution timeline"
+  "execution_trace_*.txt":
+    display: "Nextflow trace file"
+  "pipeline_dag_*.html":
+    display: "Nextflow workflow diagram"
+  "**/QC/**/*_gex_raw_n_genes_by_counts.png":
+    display: "Raw cRNA-seq raw gene number vs counts"
+  "**/QC/**/*_gex_raw_qc_violin.png":
+    display: "Raw scRNA-seq violin"
+  "**/QC/**/*_gex_raw_pct_counts_mt.png":
+    display: "Raw scRNA-seq percent counts of mitochondrial genes"
+  "**/QC/**/*_gex_raw_counts_highest_expr_genes.png":
+    display: "Raw scRNA-seq fraction of counts in each single cell, across all cells"
+  "**/QC/**/*_gex_doublet_predictions_umap.png":
+    display: "Raw scRNA-seq doublet predictions"
+  "**/QC/**/*_gex_filtered_qc_violin.png":
+    display: "QC-filtered scRNA-seq "
+  "**/QC/**/*_atac_qc_barcodes.tsv":
+    display: "QC-filtered scATAC-seq type-specific barcodes"
+  "**/QC/**/*_atac_unfiltered_tss_enrichment_score_vs_unique_fragments.png":
+    display: "Raw scATAC-seq TSS enrichment against number of unique fragments"
+  "**/subset_bam/**/*_gex_cell_clusters_umap.png":
+    display: "scRNA-seq cell clusters UMAP"
+  "**/subset_bam/**/*_gex_cell_type_labels_umap.png":
+    display: "scRNA-seq predicted cell type labels for clusters UMAP"
+  "**/subset_bam/**/*_gex_top_cell_type_scores_per_cluster.tsv":
+    display: "scRNA-seq prediction scores of all cell-types for each cluster"
+  "**/subset_bam/**/*_gex_all_cell_type_scores_per_cluster.tsv":
+    display: "scRNA-seq top cell-type prediction scores for each cluster"
+  "**/pipeline_info/*_metadata.tsv":
+    display: "Output file metadata"
+  "**/pipeline_info/*_manifest.json":
+    display: "'nf-prov' plugin legacy provenance report"
+  "**/pipeline_info/*_manifest_bco.json":
+    display: "'nf-prov' plugin BioCompute object provenance report"
+  "**/pipeline_info/*_manifest_dag.html":
+    display: "'nf-prov' plugin task graph Mermaid diagram"
